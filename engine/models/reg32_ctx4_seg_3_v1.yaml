@@ -1,0 +1,71 @@
+# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+
+# Parameters
+nc: 80  # number of classes
+depth_multiple: 1.0  # model depth multiple
+width_multiple: 1.0  # layer channel multiple
+anchors:
+  - [10,13, 16,30, 33,23]  # P3/8
+  - [30,61, 62,45, 59,119]  # P4/16
+  - [116,90, 156,198, 373,326]  # P5/32
+
+#% MODEL 4.0GF PARAMS:
+#%  'blocks': [2,5,14,2],
+#%  'dim': [32,80,240,560,1360],
+#%  'gr': 40   #(2, 6,14, 34)
+
+#% MODEL 3.2GF PARAMS:
+#%  'blocks': [2,6,15,2], # 2, 3, 4, 2
+#%  'dim': [32,96,192,432,1008],
+#%  'gr': 48   #(2, 4, 9, 21)
+
+
+# YOLOv5 v6.0 backbone
+  # [from, number, module, args]
+backbone:
+  [[-1, 1, Conv, [32, 6, 2, 2]],              # 0- (P1/2)
+   [-1, 1, Stage, [2,2,[32,96]]],       #% 1- (P2/4)  # nblock, group, (ch_in, ch_out)
+   [-1, 1, Stage, [6,4,[96,192]]],      #% 2- (P3/8)
+   [-1, 1, Stage, [15,9,[192,432]]],    #% 3- (P4/16)
+   [-1, 1, Stage, [2,21,[432,1008]]],   #% 4- (P5/32)
+   [-1, 1, PPM, [1008,252,[1,2,3,6]]],  #% 5-    # in_ch, redduction, pooling bins
+  ]
+
+# DetCtx: input, red, seg, ctx_before, outdim
+head:
+  [[[2,3,4,5], 1, SegTower, [[192,432,1008, 1008] ,192, 240]],  #6
+   [-1, 1, Conv, [240,1,1]],   #7- seg to (P3/8)
+   [-1, 1, Conv, [240,3,2]],   #8- seg to (P4/16)
+   [-1, 1, Conv, [240,3,2]],   #9- seg to (P5/32)
+
+
+   [[4,5], 1, Concat, [1]],       #10-
+   [-1, 1, Conv, [1008, 1,1]],    #11- P5 with PPM
+   [[11,9], 1, DetCtx, [1008, 504, 240, 0, 1008]],  #12- P5, [inplanes, red, seg, ctx_before, outdim]
+
+   [[8,12], 1, ConvConcat, [504,252]],              #13- 
+   [[3,-1], 1, DetCtx, [432, 216, 240, 252, 432]],  #14- P4, [inplanes, red, seg, ctx_before, outdim]
+   
+   [[7,14], 1, ConvConcat, [216,108]],             #15- 
+   [[2,-1], 1, DetCtx, [192, 96, 240, 108, 192]],    #16- #%P3,
+
+
+   [-1, 1, Conv2, [96, 96, 1,1]],                  #17-
+   [16, 1, LoadFeats, [2]],                        #18-
+   [[18,17], 1, DetCtx, [192, 96, 0, 96, 192]],    #19- #%P4
+
+   [-1, 1, Conv2, [96, 96, 3,2]],                  #20-
+   [14, 1, LoadFeats, [1]],                        #21-
+   [[21,20], 1, DetCtx, [432, 216, 0, 96, 432]],   #22- #%P4
+
+   [-1, 1, Conv2, [216, 216, 3,2]],                  #23-
+   [12, 1, LoadFeats, [0]],                           #24-
+   [[24,23], 1, DetCtx, [1008, 504, 0, 216, 1008]],  #25- #%P5
+
+
+   [19, 1, LoadFeats, [3]],                        #26- P3
+   [22, 1, LoadFeats, [4]],                        #27- P4
+   [25, 1, LoadFeats, [5]],                        #28- P5
+   [6, 1, SegHead, [240, 81]],                    #29
+   [[26,27,28], 1, Detect, [nc, anchors]]
+  ]
