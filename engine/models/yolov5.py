@@ -1,9 +1,10 @@
 import os
+from cv2 import findHomography
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from engine.utils.torch_utils import model_info
-# from .modules import YoloSegTower, SegHead, BaseConv, OnlyConv, KernelHead
+from .modules import YoloSegTower, SegHead
 # from .ctx import Ctxnet
 # from .head import Head
 
@@ -23,8 +24,8 @@ class Fullmodel(nn.Module):
         # self.aux_seg_tower = YoloSegTower(kdim=(320, 640, 1280, 1280), midim=320, outdim=320)
         # self.aux_seg_head = SegHead(320, 81)
 
-        # self.seg_tower = YoloSegTower(kdim=(320, 640, 1280), midim=320, outdim=320)
-        # self.seg_head = SegHead(320, 81)
+        self.seg_tower = YoloSegTower(kdim=(320, 640, 1280), midim=320, outdim=320)
+        self.seg_head = SegHead(320, 81)
 
         #*Instance Seg
         # self.mask_head = nn.Sequential(
@@ -105,32 +106,34 @@ class Fullmodel(nn.Module):
             'mask_pred' : tensor [B, 64, H/4, W/4]
             'seg_pred' : tensor [B, 81, H/8, W/8]
         '''
-        seg = []
+        #seg = []
         output = {}
+        fh = []
         feats = self.backbone(images) #[1/8, 1/16, 1/32, spp]
 
-        aux_seg_feats = self.aux_seg_tower(feats)
-
-        if self.training:
-            aux_seg_pred = self.aux_seg_head(aux_seg_feats)
-            output['aux_seg_pred'] = aux_seg_pred
-
-        feats_to_head = self.ob_neck(feats) #[1/8, 1/16, 1/32]
-        seg_feats = self.seg_tower(feats_to_head)
+        #aux_seg_feats = self.aux_seg_tower(feats)
 
         # if self.training:
-        box_pred = self.ob_head(feats_to_head)
-            
-        kernel_pred = self.kernel_head(feats_to_head)
-        mask_pred = self.mask_head(F.interpolate(seg_feats, feat_4_size,mode='bilinear',align_corners=True))
+        #     aux_seg_pred = self.aux_seg_head(aux_seg_feats)
+        #     output['aux_seg_pred'] = aux_seg_pred
+
+        feats_to_head = self.ob_neck(feats) #[1/8, 1/16, 1/32]
+ 
+        seg_feats = self.seg_tower(feats_to_head)
         seg_pred = self.seg_head(seg_feats)
 
+        # if self.training:
+        
+        # kernel_pred = self.kernel_head(feats_to_head)
+        # mask_pred = self.mask_head(F.interpolate(seg_feats, feat_4_size,mode='bilinear',align_corners=True))
+        box_pred = self.ob_head(feats_to_head)
+
         output['box_pred'] = box_pred #
-        output['kernel_pred'] = kernel_pred #[B, N, 64]
-        output['mask_pred'] = mask_pred #[B, 64, H/4, W/4]
+        # output['kernel_pred'] = kernel_pred #[B, N, 64]
+        # output['mask_pred'] = mask_pred #[B, 64, H/4, W/4]
         output['seg_pred'] = seg_pred #
 
-        return output, seg
+        return output
 
     def info(self, verbose=False, img_size=640):  # print model information
         model_info(self, verbose, img_size)

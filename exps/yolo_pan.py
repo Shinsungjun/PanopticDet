@@ -147,7 +147,7 @@ class Exp(BaseExp):
         head = Detect(nc=80, anchors=None) #!Need to put anchor
         
         self.model = Fullmodel(backbone=backbone, ob_neck = neck, ob_head=head)
-        
+            
         self.model.apply(init_BN)
         # self.model.head.initialize_biases(1e-2)
         return self.model

@@ -18,7 +18,7 @@ from engine.exp import get_exp
 from engine.utils import configure_nccl, configure_omp, get_num_devices
 
 import importlib
-
+os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX train parser")
     parser.add_argument("-expn", "--experiment-name", type=str, default=None)

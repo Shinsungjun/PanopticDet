@@ -226,7 +226,6 @@ class Ctx4(nn.Module):
             2 residual addition, CAT 3 features. 
         '''
         super().__init__()
-        self.red_inputs = BaseConv(inplanes, inplanes//2,1,1)
         self.block1 = nn.Sequential(*[CtxBottle13(inplanes, inplanes//2) for _ in range(nlayer)])
         self.block2 = nn.Sequential(*[CtxBottle13(inplanes//2, inplanes//2) for _ in range(nlayer)])
         self.ctx_reduce = BaseConv(2*inplanes,red,1,1)

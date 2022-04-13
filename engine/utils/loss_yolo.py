@@ -142,6 +142,7 @@ class ComputeLoss:
             tobj = torch.zeros_like(pi[..., 0], device=device)  # target obj
 
             n = b.shape[0]  # number of targets
+            print("n :", n)
             if n:
                 ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets
 
@@ -184,6 +185,7 @@ class ComputeLoss:
         bb,cc,hh,ww = pred_seg.shape
         segs = F.one_hot(segs, num_classes=81) # [nBox, 80]
         segs = segs.reshape(bb,-1,cc).type_as(pred_seg)
+        #for p_seg in pred_seg:
         seg_logits = pred_seg.permute(0,2,3,1)
         seg_logits = seg_logits.reshape(bb,-1,cc)
         lseg += self.segloss(seg_logits, segs)

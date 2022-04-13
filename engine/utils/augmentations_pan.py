@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 from engine.utils.general import colorstr, segment2box, resample_segments, check_version
-from engine.utils.metrics import bbox_ioa
+# from utils.metrics import bbox_ioa
 
 
 class Albumentations:
@@ -89,7 +89,7 @@ def replicate(im, labels):
     return im, labels
 
 
-def letterbox(im, seg, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+def letterbox(im, seg, ins_masks, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     # Resize and pad image while meeting stride-multiple constraints
     shape = im.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -118,15 +118,29 @@ def letterbox(im, seg, new_shape=(640, 640), color=(114, 114, 114), auto=True, s
     if shape[::-1] != new_unpad:  # resize
         im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
         seg = cv2.resize(seg, new_unpad, interpolation=cv2.INTER_NEAREST)
+        ins_masks = ins_masks.transpose((1,2,0))
+        ins_masks = cv2.resize(ins_masks, new_unpad)
+        if len(ins_masks.shape) == 2:
+            ins_masks = np.expand_dims(ins_masks, 0)
+        else:
+            ins_masks = ins_masks.transpose((2, 0, 1))
+
+
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     seg = cv2.copyMakeBorder(seg, top, bottom, left, right, cv2.INTER_NEAREST, value=80)  # add border
+    ins_masks = ins_masks.transpose((1,2,0))
+    ins_masks = cv2.copyMakeBorder(ins_masks, top, bottom, left, right, cv2.INTER_NEAREST, value=0)
+    if len(ins_masks.shape) == 2:
+            ins_masks = np.expand_dims(ins_masks, 0)
+    else:
+        ins_masks = ins_masks.transpose((2, 0, 1))
+    
+    return im, seg, ins_masks, ratio, (dw, dh)
 
-    return im, seg, ratio, (dw, dh)
 
-
-def random_perspective(im, seg, targets=(), segments=(), degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0,
+def random_perspective(im, seg, ins_masks, targets=(), segments=(), degrees=10, translate=.1, scale=.1, shear=10, perspective=0.0,
                        border=(0, 0)):
 
     height = im.shape[0] + border[0] * 2  # shape(h,w,c)
@@ -166,9 +180,22 @@ def random_perspective(im, seg, targets=(), segments=(), degrees=10, translate=.
         if perspective:
             im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=(114, 114, 114))
             seg = cv2.warpPerspective(seg, M, dsize=(width, height), borderValue=(80, 80, 80), interpolation = cv2.INTER_NEAREST)
+            ins_masks = ins_masks.transpose((1,2,0))
+            ins_masks = cv2.warpPerspective(ins_masks, M, dsize=(width, height), borderValue=(0, 0, 0))
+            if len(ins_masks.shape) == 2:
+                ins_masks = np.expand_dims(ins_masks, 0)
+            else:
+                ins_masks = ins_masks.transpose((2, 0, 1))
         else:  # affine
             im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
             seg = cv2.warpAffine(seg, M[:2], dsize=(width, height), borderValue=(80, 80, 80), flags = cv2.INTER_NEAREST)
+            ins_masks = ins_masks.transpose((1,2,0))
+            ins_masks = cv2.warpPerspective(ins_masks, M, dsize=(width, height), borderValue=(0, 0, 0))
+            if len(ins_masks.shape) == 2:
+                ins_masks = np.expand_dims(ins_masks, 0)
+            else:
+                ins_masks = ins_masks.transpose((2, 0, 1))
+
 
     # Transform label coordinates
     n = len(targets)
@@ -206,7 +233,7 @@ def random_perspective(im, seg, targets=(), segments=(), degrees=10, translate=.
         targets = targets[i]
         targets[:, 1:5] = new[i]
 
-    return im, seg, targets
+    return im, seg, ins_masks, targets
 
 
 def copy_paste(im, labels, segments, p=0.5):

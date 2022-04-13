@@ -116,8 +116,8 @@ class ComputeLoss:
         if g > 0:
             BCEcls, BCEobj = FocalLoss(BCEcls, g), FocalLoss(BCEobj, g)
 
-        # det = model.module.model[-1] if is_parallel(model) else model.model[-1]  # Detect() module
-        det = model.module.ob_head if is_parallel(model) else model.ob_head
+        det = model.module.model[-1] if is_parallel(model) else model.model[-1]  # Detect() module
+        # det = model.module.ob_head if is_parallel(model) else model.ob_head
         self.balance = {3: [4.0, 1.0, 0.4]}.get(det.nl, [4.0, 1.0, 0.25, 0.06, 0.02])  # P3-P7
         self.ssi = list(det.stride).index(16) if autobalance else 0  # stride 16 index
         self.BCEcls, self.BCEobj, self.gr, self.hyp, self.autobalance = BCEcls, BCEobj, 1.0, h, autobalance
@@ -130,7 +130,7 @@ class ComputeLoss:
     def __call__(self, pred, targets, segs=False):  # predictions, targets, model
     
         assert len(segs.shape) == 3
-        p = pred['box_pred']
+        p = pred[0]
         device = targets.device
         #! lseg add
         lseg, lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
@@ -180,13 +180,14 @@ class ComputeLoss:
 
         #! segmentation loss BCS
         # lseg += self.segloss(pred[1], segs)
-        pred_seg = pred['seg_pred']
-        bb,cc,hh,ww = pred_seg.shape
+        pred_seg = pred[1]
+        bb,cc,hh,ww = pred_seg[0].shape
         segs = F.one_hot(segs, num_classes=81) # [nBox, 80]
-        segs = segs.reshape(bb,-1,cc).type_as(pred_seg)
-        seg_logits = pred_seg.permute(0,2,3,1)
-        seg_logits = seg_logits.reshape(bb,-1,cc)
-        lseg += self.segloss(seg_logits, segs)
+        segs = segs.reshape(bb,-1,cc).type_as(pred_seg[0])
+        for p_seg in pred_seg:
+            seg_logits = p_seg.permute(0,2,3,1)
+            seg_logits = seg_logits.reshape(bb,-1,cc)
+            lseg += self.segloss(seg_logits, segs)
         # lseg = lseg/2.0
         # lseg += self.segloss(pred[1], segs)
 

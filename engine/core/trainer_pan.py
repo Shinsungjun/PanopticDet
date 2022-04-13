@@ -90,7 +90,7 @@ class Trainer:
 
         # model related init
         torch.cuda.set_device(self.local_rank)
-        model = self.exp.get_model_nonsequential()
+        model = self.exp.get_model()
         # logger.info(
         #     "Model Summary: {}".format(get_model_info(model.eval(), self.exp.test_size))
         # )
@@ -196,7 +196,7 @@ class Trainer:
     def train_one_iter(self):
         iter_start_time = time.time()
 
-        imgs, segs, targets, paths, _ = self.prefetcher.__next__() #! 우선 스킵
+        imgs, segs, ins_masks, targets, paths, _ = self.prefetcher.__next__() #! 우선 스킵
         data_end_time = time.time()
 
         ni = self.iter + self.max_iter * self.epoch  # number integrated batches (since train start)
