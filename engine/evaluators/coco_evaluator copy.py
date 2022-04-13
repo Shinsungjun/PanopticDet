@@ -269,17 +269,15 @@ class COCOEvaluator:
 
             # Run model
             #! add segmentation
-            output = model(img)  # inference and training outputs
-            out = output['box_pred'][0]
-            pred_seg = output['seg_pred']
+            (out, train_out), pred_seg = model(img)  # inference and training outputs
             dt[1] += time_sync() - t2
             # Compute loss
             if compute_loss:
                 #! add segmentation
-                loss += compute_loss([[x.float() for x in output['box_pred'][1]], [y.float() for y in pred_seg]], targets, segs)[1]  # box, obj, cls
+                loss += compute_loss([[x.float() for x in train_out], [y.float() for y in pred_seg]], targets, segs)[1]  # box, obj, cls
             #! add segmentation metrics
             # intersection, union, target = intersectionAndUnionGPU(pred_seg[-1].max(1)[1], segs, 81, 255)
-            intersection, union, target = intersectionAndUnionGPU(pred_seg.max(1)[1], segs, 81, 255)
+            intersection, union, target = intersectionAndUnionGPU(pred_seg[0].max(1)[1], segs, 81, 255)
             # intersection, union, target = intersectionAndUnionGPU(pred_seg[-1].max(1)[1], segs, 80, 80)
             intersection, union, target = intersection.cpu().numpy(), union.cpu().numpy(), target.cpu().numpy()
             intersection_meter.update(intersection), union_meter.update(union), target_meter.update(target)
