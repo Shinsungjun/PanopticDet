@@ -571,9 +571,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             img, (h0, w0), (h, w), image_id = load_image(self, index)
 
             seg, ins_masks, no_target = self.load_segmentation(image_id)
-
+            
             if no_target:
-                pass#! NEED TO RESAMPLING
+                print("WARNING: Mask is None, ReSampling ...", index)
+                return self.__getitem__(random.randint(0, len(self.indices)-1))
 
             shape = self.batch_shapes[self.batch[index]] if self.rect else self.img_size  # final letterboxed shape val : rect == True
 
@@ -593,7 +594,9 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         nl = len(labels) # number of labels
         if nl:
             labels[:, 1:5] = xyxy2xywhn(labels[:, 1:5], w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
-
+        else:
+            print("WARNING: Mask is None, ReSampling ...", index)
+            return self.__getitem__(random.randint(0, len(self.indices)-1))
         if self.augment:
             # Albumentations
             img, labels = self.albumentations(img, labels)
@@ -601,7 +604,6 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
             # HSV color-space
             augment_hsv(img, hgain=hyp['hsv_h'], sgain=hyp['hsv_s'], vgain=hyp['hsv_v'])
-            print('masks shape: ', ins_masks.shape)
             # Flip up-down
             if random.random() < hyp['flipud']:
                 img = np.flipud(img)
@@ -714,6 +716,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         target = [x for x in anns if x['image_id'] == id]
         if len(target) == 0:
             no_target = True
+            return 0, 0, no_target
 
         ins_masks = [self.coco.annToMask(obj).reshape(-1) for obj in target]
         ins_masks = np.vstack(ins_masks)

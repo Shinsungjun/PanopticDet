@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from engine.utils.torch_utils import model_info
-from .modules import YoloSegTower, SegHead, BaseConv, OnlyConv, KernelHead
+from .modules import YoloSegTower, SegHead
 # from .ctx import Ctxnet
 # from .head import Head
 
@@ -28,12 +28,12 @@ class Fullmodel(nn.Module):
         self.seg_head = SegHead(320, 81)
 
         #*Instance Seg
-        self.mask_head = nn.Sequential(
-                            BaseConv(in_channels=320, out_channels=320, ksize=3, stride=1, padding=1),
-                            OnlyConv(in_channels=320, out_channels=64, ksize=1, stride=1)
-                        )
+        # self.mask_head = nn.Sequential(
+        #                     BaseConv(in_channels=320, out_channels=320, ksize=3, stride=1, padding=1),
+        #                     OnlyConv(in_channels=320, out_channels=64, ksize=1, stride=1)
+        #                 )
 
-        self.kernel_head = KernelHead(kdim=(320,640,1280), outdim = 64)
+        # self.kernel_head = KernelHead(kdim=(320,640,1280), outdim = 64)
 
         # Build strides, anchors
         m = self.ob_head  # Detect()
@@ -108,7 +108,8 @@ class Fullmodel(nn.Module):
         '''
         #seg = []
         output = {}
-        feats, feat_4_size = self.backbone(images) #[1/8, 1/16, 1/32, spp]
+        fh = []
+        feats = self.backbone(images) #[1/8, 1/16, 1/32, spp]
 
         aux_seg_feats = self.aux_seg_tower(feats)
 
@@ -123,13 +124,13 @@ class Fullmodel(nn.Module):
 
         # if self.training:
         
-        kernel_pred = self.kernel_head(feats_to_head)
-        mask_pred = self.mask_head(F.interpolate(seg_feats, feat_4_size,mode='bilinear',align_corners=True))
+        # kernel_pred = self.kernel_head(feats_to_head)
+        # mask_pred = self.mask_head(F.interpolate(seg_feats, feat_4_size,mode='bilinear',align_corners=True))
         box_pred = self.ob_head(feats_to_head)
 
         output['box_pred'] = box_pred #
-        output['kernel_pred'] = kernel_pred #[B, N, 64]
-        output['mask_pred'] = mask_pred #[B, 64, H/4, W/4]
+        # output['kernel_pred'] = kernel_pred #[B, N, 64]
+        # output['mask_pred'] = mask_pred #[B, 64, H/4, W/4]
         output['seg_pred'] = seg_pred #
 
         return output

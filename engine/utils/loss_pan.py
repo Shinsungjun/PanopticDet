@@ -9,12 +9,31 @@ import torch.nn.functional as F
 
 from engine.utils.metrics import bbox_iou
 from engine.utils.torch_utils import is_parallel
+from engine.utils.general import xywh2xyxy
 
 
 def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#issuecomment-598028441
     # return positive, negative label smoothing BCE targets
     return 1.0 - 0.5 * eps, 0.5 * eps
 
+def yolo2yolact_target(targets):
+    '''
+    yolo target -> yolact target
+    yolo : tensors [img_num, class, x, y, w, h]
+    yolact : list of tensors [img1:[num_objs, x1, y1, x2, y2, class], img2:[...]]
+    '''
+    #* convert xywh -> xyxy format
+    convert_target = targets.clone().detach()
+    xywhbox = convert_target[:, 2:]
+    xyxybox = xywh2xyxy(xywhbox)
+    t_cls = convert_target[:, 1:2].clone()
+    convert_target[:, 1:5] = xyxybox
+    convert_target[:, 5:6] = t_cls
+    
+    #* convert tensors -> list of tensors
+    yolact_target = []
+    batch_target = []
+    
 
 class BCEBlurWithLogitsLoss(nn.Module):
     # BCEwithLogitLoss() with reduced missing label effects.
@@ -136,6 +155,10 @@ class ComputeLoss:
         lseg, lcls, lbox, lobj = torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
         tcls, tbox, indices, anchors = self.build_targets(p, targets)  # targets
 
+        #! make yolact target
+
+        #! compute mask loss
+        
         # Losses
         for i, pi in enumerate(p):  # layer index, layer predictions
             b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx

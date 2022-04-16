@@ -91,7 +91,7 @@ class CSPDarkNet(nn.Module):
         f2 = self.stem(x)
 
         f4 = self.B4(f2) #1/4
-
+        b,c, h,w = f4.shape
         f8 = self.B8(f4) #1/8
         feats.append(f8)
 
@@ -107,7 +107,7 @@ class CSPDarkNet(nn.Module):
         spp = self.SPPF(f32)
         feats.append(spp)
         
-        return feats
+        return feats, (h,w)
 
 def main():
     backbone = CSPDarkNet()

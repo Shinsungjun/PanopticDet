@@ -44,8 +44,8 @@ class Trainer:
 
         # training related attr
         self.max_epoch = exp.max_epoch
-        self.amp_training = True
-        self.scaler = torch.cuda.amp.GradScaler(enabled=True)
+        self.amp_training = False
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.amp_training)
         self.is_distributed = get_world_size() > 1
         self.rank = get_rank()
         self.local_rank = get_local_rank()
@@ -196,7 +196,7 @@ class Trainer:
     def train_one_iter(self):
         iter_start_time = time.time()
 
-        imgs, segs, targets, paths, _ = self.prefetcher.__next__() #! 우선 스킵
+        imgs, segs, ins_masks, targets, paths, _ = self.prefetcher.__next__() #! 우선 스킵
         data_end_time = time.time()
 
         ni = self.iter + self.max_iter * self.epoch  # number integrated batches (since train start)
@@ -217,12 +217,14 @@ class Trainer:
 
         # Forward
         inf_start_time = time.time()
-
+        for i in range(len(ins_masks)):
+            ins_masks[i] = ins_masks[i].to(self.device)
+        
         with torch.cuda.amp.autocast(enabled=self.amp_training):
             pred = self.model(imgs)  # forward
             inf_end_time = time.time()
 
-            loss, loss_items = self.compute_loss(pred, targets.to(self.device), segs.to(self.device))  # loss scaled by batch_size
+            loss, loss_items = self.compute_loss(pred, targets.to(self.device), segs.to(self.device), ins_masks)  # loss scaled by batch_size
             if self.rank != -1:
                 loss *= get_world_size()  # gradient averaged between devices in DDP mode
 
@@ -245,6 +247,7 @@ class Trainer:
         outputs['obj_loss'] = loss_items[1]
         outputs['cls_loss'] = loss_items[2]
         outputs['seg_loss'] = loss_items[3]
+        outputs['mask_loss'] = loss_items[4]
         iter_end_time = time.time()
         lr = [x['lr'] for x in self.optimizer.param_groups][0]  # for loggers
 
